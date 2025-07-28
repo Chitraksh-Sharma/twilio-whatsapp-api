@@ -17,7 +17,7 @@ This project provides a simple API to send WhatsApp messages using the Twilio AP
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Chitraksh-Sharma/twilio-whatsapp-api.git
 cd twilio_whatsapp
 ```
 
