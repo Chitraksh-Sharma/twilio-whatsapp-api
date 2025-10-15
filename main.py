@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from twilio.rest import Client
 import os
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, List
 import logging
 
 # Load environment variables
@@ -45,6 +45,20 @@ class WhatsAppMessage(BaseModel):
                 "message": "Hello! This is a test message from FastAPI."
             }
         }
+    
+class BulkMessageRequest(BaseModel):
+    numbers: List[str] = Field(..., description="List of recipient WhatsApp numbers (format: whatsapp:+1234567890)")
+    message: str = Field(..., min_length=1, max_length=1600, description="Message content")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "numbers": ["whatsapp:+911XXXXXXXX1", "whatsapp:+911XXXXXXXX2"],
+                "message": "Hello! This is a bulk message from FastAPI."
+            }
+        }
+
+
 
 class MessageResponse(BaseModel):
     success: bool
@@ -117,6 +131,36 @@ async def send_whatsapp_message(message_data: WhatsAppMessage):
             success=False,
             error=error_msg
         )
+
+
+@app.post("/send-bulk-message", response_model= List[MessageResponse])
+async def send_whatsapp_bulk_message(bulk_data: BulkMessageRequest):
+    """Send a WhatsApp message to multiple recipients"""
+    responses = []
+
+    logger.info(f"Total Number: {len(bulk_data.numbers)}")
+    for number in bulk_data.numbers:
+        try:
+            if not number.startswith("whatsapp:+"):
+                responses.append(MessageResponse(success=False, error=f"Invalid number format: {number}"))
+                continue
+
+            message = client.messages.create(
+                from_=TWILIO_WHATSAPP_NUMBER,
+                body=bulk_data.message,
+                to=number
+            )
+            logger.info(f"Message sent to {number}. SID: {message.sid}")
+            responses.append(MessageResponse(success=True, message_sid=message.sid, status=message.status))
+
+        except Exception as e:
+            logger.error(f"Error sending to {number}: {str(e)}")
+            error_msg = f"Twilio Error {getattr(e, 'code', 'N/A')}: {getattr(e, 'msg', str(e))}"
+            responses.append(MessageResponse(success=False, error=error_msg))
+
+    return responses
+        
+
 
 # Health check endpoint
 @app.get("/health")
